@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đăng Ký Vé Tháng</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding: 0;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        .main-container {
+            display: flex;
+            flex-direction: column;
+            margin: 20px auto;
+            max-width: 800px;
+            flex: 1;
+        }
+        .form-container {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-top: 20px;
+        }
+        .result-container {
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            display: none;
+        }
+        .processing-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            color: white;
+            font-size: 24px;
+            display: none;
+        }
+        .navbar {
+            padding: 15px 0;
+        }
+        .nav-item {
+            margin: 0 5px;
+        }
+        .nav-item.active .nav-link {
+            font-weight: bold;
+        }
+        .title-section {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .title-section h1 {
+            color: #343a40;
+            margin-bottom: 10px;
+        }
+        .title-section p {
+            color: #6c757d;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar đơn giản - Thêm vào tất cả các template hiện có -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+        <div class="container">
+            <a class="navbar-brand" href="/">Hệ Thống Quản Lý Bãi Xe</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">Home</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/entry">Cổng Vào</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/exit">Cổng Ra</a>
+                    </li>
+                    <li class="nav-item active">
+                        <a class="nav-link" href="/monthly_ticket">Vé Tháng</a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="searchDropdown" role="button" data-bs-toggle="dropdown">
+                            Tra Cứu
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="/search_parking">Lịch sử ra vào</a></li>
+                            <li><a class="dropdown-item" href="/search_monthly_tickets">Lịch sử vé tháng</a></li>
+                        </ul>
+                    </li>
+                    {% if current_user.is_authenticated and current_user.role == 'admin' %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/users">Quản Lý Tài Khoản</a>
+                    </li>
+                    {% endif %}
+                </ul>
+                <div class="d-flex align-items-center">
+                    <span class="me-3">Xin chào, {{ current_user.username }}</span>
+                    <a href="/logout" class="btn btn-outline-danger btn-sm">Đăng xuất</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Overlay hiển thị khi đang xử lý -->
+    <div class="processing-overlay" id="processingOverlay">
+        <div>Đang xử lý...</div>
+    </div>
+    
+    <!-- Main content -->
+    <div class="main-container">
+        <div class="title-section">
+            <h1>Đăng Ký Vé Tháng</h1>
+            <p>Điền thông tin sinh viên và biển số xe để đăng ký vé tháng</p>
+        </div>
+        
+        <div class="form-container">
+            <form id="monthlyTicketForm">
+                <div class="mb-3">
+                    <label for="studentId" class="form-label">Mã Sinh Viên</label>
+                    <input type="text" class="form-control" id="studentId" placeholder="Nhập mã sinh viên" required>
+                </div>
+                <div class="mb-3">
+                    <label for="licensePlate" class="form-label">Biển Số Xe</label>
+                    <input type="text" class="form-control" id="licensePlate" placeholder="Nhập biển số xe" required>
+                </div>
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-primary btn-lg">Đăng Ký</button>
+                </div>
+            </form>
+        </div>
+        
+        <div class="result-container" id="resultContainer">
+            <!-- Kết quả đăng ký sẽ hiển thị ở đây -->
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            $('#monthlyTicketForm').on('submit', function(e) {
+                e.preventDefault();
+                
+                const studentId = $('#studentId').val().trim();
+                const licensePlate = $('#licensePlate').val().trim();
+                
+                if (!studentId || !licensePlate) {
+                    alert('Vui lòng nhập đầy đủ thông tin');
+                    return;
+                }
+                
+                // Hiển thị overlay đang xử lý
+                $('#processingOverlay').show();
+                
+                // Tạo timestamp tại thời điểm nhấn nút đăng ký
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                const seconds = String(now.getSeconds()).padStart(2, '0');
+                const clientTimestamp = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+                
+                // Gửi yêu cầu đăng ký
+                $.ajax({
+                    url: '/register_monthly_ticket',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        bien_so_xe: licensePlate,
+                        ma_sinh_vien: studentId,
+                        client_timestamp: clientTimestamp
+                    }),
+                    success: function(response) {
+                        // Ẩn overlay
+                        $('#processingOverlay').hide();
+                        
+                        // Hiển thị kết quả
+                        $('#resultContainer').show();
+                        
+                        if (response.status === 'success') {
+                            $('#resultContainer').html(`
+                                <div class="alert alert-success">
+                                    <h4 class="alert-heading">Đăng Ký Thành Công!</h4>
+                                    <p>${response.message}</p>
+                                    <hr>
+                                    <p class="mb-0">Thời gian đăng ký: ${response.timestamp}</p>
+                                </div>
+                            `);
+                            
+                            // Reset form
+                            $('#monthlyTicketForm')[0].reset();
+                        } else {
+                            $('#resultContainer').html(`
+                                <div class="alert alert-danger">
+                                    <h4 class="alert-heading">Đăng Ký Thất Bại!</h4>
+                                    <p>${response.message}</p>
+                                    <hr>
+                                    <p class="mb-0">Vui lòng kiểm tra lại thông tin và thử lại.</p>
+                                </div>
+                            `);
+                        }
+                    },
+                    error: function() {
+                        // Ẩn overlay
+                        $('#processingOverlay').hide();
+                        
+                        // Hiển thị lỗi
+                        $('#resultContainer').show();
+                        $('#resultContainer').html(`
+                            <div class="alert alert-danger">
+                                <h4 class="alert-heading">Lỗi Kết Nối!</h4>
+                                <p>Không thể kết nối đến máy chủ. Vui lòng thử lại sau.</p>
+                            </div>
+                        `);
+                    }
+                });
+            });
+        });
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

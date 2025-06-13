@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản Lý Người Dùng - Hệ Thống Quản Lý Bãi Xe</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+    <style>
+        body {
+            padding: 0;
+            font-family: Arial, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background-color: #f8f9fa;
+        }
+        .navbar {
+            padding: 15px 0;
+        }
+        .nav-item {
+            margin: 0 5px;
+        }
+        .nav-item.active .nav-link {
+            font-weight: bold;
+            /* color: #007bff; */
+        }
+        .main-container {
+            flex: 1;
+            padding: 20px 0;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .users-table {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        }
+        .page-title {
+            margin-bottom: 30px;
+            border-bottom: 1px solid #dee2e6;
+            padding-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .page-title h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .role-admin {
+            background-color: #dc3545;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .role-staff {
+            background-color: #28a745;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .btn-sm {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+            margin: 0 2px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar đơn giản -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+        <div class="container">
+            <a class="navbar-brand" href="/">Hệ Thống Quản Lý Bãi Xe</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">Home</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/entry">Cổng Vào</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/exit">Cổng Ra</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/monthly_ticket">Vé Tháng</a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="searchDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            Tra Cứu
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="searchDropdown">
+                            <li><a class="dropdown-item" href="/search_parking">Lịch sử ra vào</a></li>
+                            <li><a class="dropdown-item" href="/search_monthly_tickets">Lịch sử vé tháng</a></li>
+                        </ul>
+                    </li>
+                    {% if current_user.is_authenticated and current_user.role == 'admin' %}
+                    <li class="nav-item active">
+                        <a class="nav-link" href="/admin/users">Quản Lý Tài Khoản</a>
+                    </li>
+                    {% endif %}
+                </ul>
+                <div class="d-flex align-items-center">
+                    <span class="me-3">Xin chào, {{ current_user.username }}</span>
+                    <a href="/logout" class="btn btn-outline-danger btn-sm">Đăng xuất</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+    
+    <div class="main-container container">
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <div class="page-title">
+            <h1>Quản Lý Tài Khoản</h1>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addUserModal">
+                <i class="bi bi-plus-lg"></i> Thêm Tài Khoản
+            </button>
+        </div>
+        
+        <!-- Bảng danh sách người dùng -->
+        <div class="users-table">
+            <table class="table table-hover table-striped">
+                <thead class="table-light">
+                    <tr>
+                        <th scope="col">#</th>
+                        <th scope="col">Tên đăng nhập</th>
+                        <th scope="col">Vai trò</th>
+                        <th scope="col">Đăng nhập gần nhất</th>
+                        <th scope="col">Ngày tạo</th>
+                        <th scope="col">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <th scope="row">{{ loop.index }}</th>
+                        <td>{{ user.username }}</td>
+                        <td>
+                            {% if user.role == 'admin' %}
+                                <span class="role-admin">Admin</span>
+                            {% else %}
+                                <span class="role-staff">Nhân viên</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ user.last_login or 'Chưa đăng nhập' }}</td>
+                        <td>{{ user.created_at }}</td>
+                        <!-- Thêm nút phân quyền vào cột thao tác -->
+                        <td>
+                            <button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#editUserModal" 
+                                data-user-id="{{ user.id }}" 
+                                data-username="{{ user.username }}" 
+                                data-role="{{ user.role }}">
+                                <i class="bi bi-pencil"></i> Sửa
+                            </button>
+                            
+                            {% if user.role == 'staff' %}
+                            <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#permissionsModal" 
+                                data-user-id="{{ user.id }}" 
+                                data-username="{{ user.username }}">
+                                <i class="bi bi-shield-lock"></i> Phân quyền
+                            </button>
+                            {% endif %}
+                            
+                            {% if user.id != current_user.id %}
+                            <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteUserModal" 
+                                data-user-id="{{ user.id }}" 
+                                data-username="{{ user.username }}">
+                                <i class="bi bi-trash"></i> Xóa
+                            </button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center">Chưa có tài khoản nào.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- Modal Thêm người dùng -->
+    <div class="modal fade" id="addUserModal" tabindex="-1" aria-labelledby="addUserModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addUserModalLabel">Thêm Tài Khoản Mới</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form action="{{ url_for('admin_users_add') }}" method="post">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="username" class="form-label">Tên đăng nhập</label>
+                            <input type="text" class="form-control" id="username" name="username" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="password" class="form-label">Mật khẩu</label>
+                            <input type="password" class="form-control" id="password" name="password" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="role" class="form-label">Vai trò</label>
+                            <select class="form-select" id="role" name="role" required>
+                                <option value="staff">Nhân viên</option>
+                                <option value="admin">Admin</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                        <button type="submit" class="btn btn-primary">Thêm</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal Chỉnh sửa người dùng -->
+    <div class="modal fade" id="editUserModal" tabindex="-1" aria-labelledby="editUserModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editUserModalLabel">Chỉnh Sửa Tài Khoản</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="editUserForm" action="" method="post">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="edit-username" class="form-label">Tên đăng nhập</label>
+                            <input type="text" class="form-control" id="edit-username" name="username" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit-password" class="form-label">Mật khẩu mới (để trống nếu không thay đổi)</label>
+                            <input type="password" class="form-control" id="edit-password" name="password">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Vai trò</label>
+                            <div id="edit-role" class="form-control-plaintext"></div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                        <button type="submit" class="btn btn-primary">Lưu thay đổi</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal Xóa người dùng -->
+    <div class="modal fade" id="deleteUserModal" tabindex="-1" aria-labelledby="deleteUserModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteUserModalLabel">Xác Nhận Xóa Tài Khoản</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Bạn có chắc chắn muốn xóa tài khoản <strong id="delete-username"></strong>?</p>
+                    <p class="text-danger">Lưu ý: Hành động này không thể hoàn tác!</p>
+                </div>
+                <div class="modal-footer">
+                    <form id="deleteUserForm" action="" method="post">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                        <button type="submit" class="btn btn-danger">Xóa</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Thêm Modal Phân quyền -->
+    <div class="modal fade" id="permissionsModal" tabindex="-1" aria-labelledby="permissionsModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="permissionsModalLabel">Phân Quyền Người Dùng</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="permissionsForm" action="" method="post">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <h6 class="permissions-username fw-bold"></h6>
+                        </div>
+                        
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="entry_access" name="entry_access">
+                            <label class="form-check-label" for="entry_access">
+                                <i class="bi bi-door-open"></i> Cổng vào
+                            </label>
+                        </div>
+                        
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="exit_access" name="exit_access">
+                            <label class="form-check-label" for="exit_access">
+                                <i class="bi bi-door-closed"></i> Cổng ra
+                            </label>
+                        </div>
+                        
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="monthly_ticket_access" name="monthly_ticket_access">
+                            <label class="form-check-label" for="monthly_ticket_access">
+                                <i class="bi bi-ticket-perforated"></i> Đăng ký vé tháng
+                            </label>
+                        </div>
+                        
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="search_access" name="search_access">
+                            <label class="form-check-label" for="search_access">
+                                <i class="bi bi-search"></i> Tra cứu
+                            </label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                        <button type="submit" class="btn btn-primary">Lưu thay đổi</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            // Xử lý modal chỉnh sửa
+            $('#editUserModal').on('show.bs.modal', function (event) {
+                var button = $(event.relatedTarget);
+                var userId = button.data('user-id');
+                var username = button.data('username');
+                var role = button.data('role');
+                
+                var modal = $(this);
+                modal.find('#edit-username').val(username);
+                modal.find('#edit-role').text(role === 'admin' ? 'Admin' : 'Nhân viên');
+                modal.find('#editUserForm').attr('action', '/admin/users/edit/' + userId);
+            });
+            
+            // Xử lý modal xóa
+            $('#deleteUserModal').on('show.bs.modal', function (event) {
+                var button = $(event.relatedTarget);
+                var userId = button.data('user-id');
+                var username = button.data('username');
+                
+                var modal = $(this);
+                modal.find('#delete-username').text(username);
+                modal.find('#deleteUserForm').attr('action', '/admin/users/delete/' + userId);
+            });
+        });
+    </script>
+    <script>
+    $(document).ready(function() {
+        // Xử lý modal phân quyền
+        $('#permissionsModal').on('show.bs.modal', function (event) {
+            var button = $(event.relatedTarget);
+            var userId = button.data('user-id');
+            var username = button.data('username');
+            
+            var modal = $(this);
+            modal.find('.permissions-username').text('Phân quyền cho: ' + username);
+            modal.find('#permissionsForm').attr('action', '/admin/users/permissions/' + userId);
+            
+            // Reset form
+            $('#entry_access').prop('checked', false);
+            $('#exit_access').prop('checked', false);
+            $('#monthly_ticket_access').prop('checked', false);
+            $('#search_access').prop('checked', false);
+            
+            // Lấy thông tin phân quyền hiện tại
+            $.ajax({
+                url: '/admin/get_user_permissions/' + userId,
+                type: 'GET',
+                success: function(response) {
+                    if (response.success && response.permissions) {
+                        $('#entry_access').prop('checked', response.permissions.entry_access);
+                        $('#exit_access').prop('checked', response.permissions.exit_access);
+                        $('#monthly_ticket_access').prop('checked', response.permissions.monthly_ticket_access);
+                        $('#search_access').prop('checked', response.permissions.search_access);
+                    }
+                }
+            });
+        });
+    });
+</script>
+</body>
+</html>

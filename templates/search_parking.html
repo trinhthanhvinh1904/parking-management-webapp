@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tra cứu lịch sử ra vào - Hệ thống quản lý bãi đỗ xe</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            padding: 0;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        .main-container {
+            display: flex;
+            flex-direction: column;
+            margin: 20px auto;
+            max-width: 1200px;
+            flex: 1;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .title-section {
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        .title-section h1 {
+            color: #343a40;
+            margin-bottom: 10px;
+        }
+        .title-section p {
+            color: #6c757d;
+            font-size: 16px;
+        }
+        .table-striped tbody tr:nth-of-type(odd) {
+            background-color: rgba(0,0,0,.05);
+        }
+        .pagination {
+            margin-top: 20px;
+            justify-content: center;
+        }
+        .export-btn {
+            margin-top: 20px;
+        }
+        .search-form {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        .processing-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 24px;
+        }
+        .navbar {
+            padding: 15px 0;
+        }
+        .nav-item {
+            margin: 0 5px;
+        }
+        .nav-link.active {
+            font-weight: bold;
+            color: #0d6efd;
+        }
+        th {
+            background-color: #0d6efd;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+        <div class="container">
+            <a class="navbar-brand" href="/">Hệ Thống Quản Lý Bãi Xe</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">Home</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/entry">Cổng Vào</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/exit">Cổng Ra</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/monthly_ticket">Vé Tháng</a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle active" href="#" id="searchDropdown" role="button" data-bs-toggle="dropdown">
+                            Tra Cứu
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item active" href="/search_parking">Lịch sử ra vào</a></li>
+                            <li><a class="dropdown-item" href="/search_monthly_tickets">Lịch sử vé tháng</a></li>
+                        </ul>
+                    </li>
+                    {% if current_user.is_authenticated and current_user.role == 'admin' %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/users">Quản Lý Tài Khoản</a>
+                    </li>
+                    {% endif %}
+                </ul>
+                <div class="d-flex align-items-center">
+                    <span class="text-dark me-3">Xin chào, {{ current_user.username }}</span>
+                    <a href="/logout" class="btn btn-outline-danger btn-sm">Đăng xuất</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Overlay hiển thị khi đang xử lý -->
+    <div class="processing-overlay" id="processingOverlay">
+        <div>Đang xử lý...</div>
+    </div>
+    
+    <div class="container" style="margin-top: 80px;">
+        <!-- Thông báo flash -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <div class="main-container">
+            <div class="title-section">
+                <h1>Tra cứu lịch sử ra vào bãi đỗ xe</h1>
+                <p>Nhập biển số xe và khoảng thời gian để tìm kiếm</p>
+            </div>
+            
+            <!-- Form tìm kiếm -->
+            <div class="search-form">
+                <form action="{{ url_for('search_parking_results') }}" method="get">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label for="bien_so" class="form-label">Biển số xe</label>
+                            <input type="text" class="form-control" id="bien_so" name="bien_so" placeholder="Nhập biển số xe" value="{{ bien_so }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="start_date" class="form-label">Từ ngày</label>
+                            <input type="date" class="form-control" id="start_date" name="start_date" value="{{ start_date }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="end_date" class="form-label">Đến ngày</label>
+                            <input type="date" class="form-control" id="end_date" name="end_date" value="{{ end_date }}">
+                        </div>
+                        <div class="col-12 text-center mt-4">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-search"></i> Tìm kiếm
+                            </button>
+                            <button type="reset" class="btn btn-secondary">
+                                <i class="fas fa-sync"></i> Xoá bộ lọc
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            
+            <!-- Kết quả tìm kiếm -->
+            {% if has_results %}
+                {% if results %}
+                    <div class="table-responsive">
+                        <table class="table table-striped table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Biển số xe</th>
+                                    <th>Thời gian vào</th>
+                                    <th>Thời gian ra</th>
+                                    <th>Loại vé</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in results %}
+                                <tr>
+                                    <td>{{ row.bien_so_xe }}</td>
+                                    <td>{{ row.thoi_gian_vao_display }}</td>
+                                    <td>{{ row.thoi_gian_ra_display }}</td>
+                                    <td>{{ row.loai_ve }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Phân trang -->
+                    {% if total_pages > 1 %}
+                    <nav>
+                        <ul class="pagination">
+                            {# Hiển thị nút Previous #}
+                            <li class="page-item {% if current_page == 1 %}disabled{% endif %}">
+                                <a class="page-link" href="{{ url_for('search_parking_results', bien_so=bien_so, start_date=start_date, end_date=end_date, page=current_page-1) if current_page > 1 else '#' }}">
+                                    &laquo; Trước
+                                </a>
+                            </li>
+                            
+                            {# Tính toán giá trị start_page #}
+                            {% set start_page = current_page - 2 %}
+                            {% if start_page < 1 %}
+                                {% set start_page = 1 %}
+                            {% endif %}
+
+                            {# Tính toán giá trị end_page #}
+                            {% set end_page = current_page + 3 %}
+                            {% if end_page > total_pages + 1 %}
+                                {% set end_page = total_pages + 1 %}
+                            {% endif %}
+
+                            {# Hiển thị các số trang #}
+                            {% for page_num in range(start_page, end_page) %}
+                            <li class="page-item {% if page_num == current_page %}active{% endif %}">
+                                <a class="page-link" href="{{ url_for('search_parking_results', bien_so=bien_so, start_date=start_date, end_date=end_date, page=page_num) }}">
+                                    {{ page_num }}
+                                </a>
+                            </li>
+                            {% endfor %}
+                            
+                            {# Hiển thị nút Next #}
+                            <li class="page-item {% if current_page == total_pages %}disabled{% endif %}">
+                                <a class="page-link" href="{{ url_for('search_parking_results', bien_so=bien_so, start_date=start_date, end_date=end_date, page=current_page+1) if current_page < total_pages else '#' }}">
+                                    Tiếp &raquo;
+                                </a>
+                            </li>
+                        </ul>
+                    </nav>
+                    {% endif %}
+                    
+                    <!-- Nút xuất Excel -->
+                    <div class="text-center export-btn">
+                        <a href="{{ url_for('export_parking_excel', bien_so=bien_so, start_date=start_date, end_date=end_date) }}" class="btn btn-success btn-lg">
+                            <i class="fas fa-file-excel"></i> Xuất Excel
+                        </a>
+                    </div>
+                {% else %}
+                    <div class="alert alert-info text-center">
+                        Không tìm thấy kết quả nào phù hợp với tiêu chí tìm kiếm
+                    </div>
+                {% endif %}
+            {% endif %}
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
